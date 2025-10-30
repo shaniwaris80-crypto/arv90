@@ -106,9 +106,6 @@ if ('serviceWorker' in navigator) {
         <label class="check"><input type="checkbox" id="chkTransporte" /> Añadir transporte 10%</label>
         <label class="check"><input type="checkbox" id="chkIvaIncluido" checked /> IVA 4% incluido (informativo)</label>
 
-        <!-- 🔹 NUEVO BOTÓN PARA APLICAR IVA REAL -->
-        <button id="btnAddIVA" class="ghost">+ Añadir IVA 4%</button>
-
         <div class="totals-grid">
           <div>Subtotal</div><div id="subtotal">0,00 €</div>
           <div>Transporte</div><div id="transp">0,00 €</div>
@@ -158,9 +155,11 @@ if ('serviceWorker' in navigator) {
     <div id="printArea" class="print">
       <div class="pdf-header">
         <div class="pdf-brand">
+          <!-- Logo kiwi (SVG pequeño) solo en PDF -->
           <svg id="pdf-kiwi" width="42" height="42" viewBox="0 0 100 100" aria-hidden="true">
             <circle cx="50" cy="50" r="45" fill="#9acd32" stroke="#5a7f1a" stroke-width="6"></circle>
             <circle cx="50" cy="50" r="24" fill="#fff" stroke="#7fbf3f" stroke-width="5"></circle>
+            <!-- semillas -->
             <g fill="#2b2b2b">
               <circle cx="50" cy="28" r="3"></circle>
               <circle cx="64" cy="32" r="3"></circle>
@@ -211,37 +210,149 @@ if ('serviceWorker' in navigator) {
       <div class="pdf-foot" id="pdf-foot-note">IVA incluido en los precios.</div>
     </div>
 
+    <!-- Historial de precios -->
     <aside id="pricePanel" hidden>
       <div class="pp-title">Historial de precios</div>
       <div id="ppBody"></div>
     </aside>
   </section>
-  <!-- KPIs para VENTAS / RESUMEN -->
-<section class="panel" data-tab-panel="ventas">
-  <h3>📈 Ventas</h3>
-  <div class="kpis">
-    <div class="kpi"><span>Hoy</span><strong id="vHoy">0,00 €</strong></div>
-    <div class="kpi"><span>Semana</span><strong id="vSemana">0,00 €</strong></div>
-    <div class="kpi"><span>Mes</span><strong id="vMes">0,00 €</strong></div>
-    <div class="kpi"><span>Total</span><strong id="vTotal">0,00 €</strong></div>
-  </div>
-  <canvas id="chartDiario" height="120"></canvas>
-  <canvas id="chartMensual" height="120"></canvas>
-  <canvas id="chartTop" height="120"></canvas>
-</section>
 
-<section class="panel" data-tab-panel="resumen">
-  <h3>📊 Resumen</h3>
-  <div class="kpis">
-    <div class="kpi"><span>Hoy</span><strong id="rHoy">0,00 €</strong></div>
-    <div class="kpi"><span>Semana</span><strong id="rSemana">0,00 €</strong></div>
-    <div class="kpi"><span>Mes</span><strong id="rMes">0,00 €</strong></div>
-    <div class="kpi"><span>Total</span><strong id="rTotal">0,00 €</strong></div>
-  </div>
-</section>
+  <!-- CLIENTES -->
+  <section class="panel" data-tab-panel="clientes">
+    <div class="card">
+      <div class="title-row">
+        <h3>Clientes</h3>
+        <div class="row">
+          <input id="buscarCliente" class="search" placeholder="Buscar cliente…" />
+          <button id="btnAddCliente">+ Añadir</button>
+          <button id="btnExportClientes" class="ghost">⤓ Exportar</button>
+          <button id="btnImportClientes" class="ghost">⤒ Importar</button>
+        </div>
+      </div>
+      <div id="listaClientes" class="list"></div>
+    </div>
+  </section>
 
+  <!-- FACTURAS -->
+  <section class="panel" data-tab-panel="facturas">
+    <div class="card">
+      <div class="title-row">
+        <h3>Facturas</h3>
+        <div class="row">
+          <select id="filtroEstado">
+            <option value="todas">Todas</option>
+            <option value="pendiente">Impagadas</option>
+            <option value="parcial">Parciales</option>
+            <option value="pagado">Pagadas</option>
+          </select>
+          <input id="buscaCliente" class="search" placeholder="Buscar por cliente…" />
+          <button id="btnExportFacturas" class="ghost">⤓ Exportar</button>
+          <button id="btnImportFacturas" class="ghost">⤒ Importar</button>
+        </div>
+      </div>
+      <div id="listaFacturas" class="list"></div>
+    </div>
+  </section>
 
-  <!-- (resto del documento idéntico a tu versión original) -->
+  <!-- PRODUCTOS -->
+  <section class="panel" data-tab-panel="productos">
+    <div class="card">
+      <div class="title-row">
+        <h3>Productos</h3>
+        <div class="row">
+          <input id="buscarProducto" class="search" placeholder="Buscar producto…" />
+          <button id="btnAddProducto">+ Añadir</button>
+          <button id="btnExportProductos" class="ghost">⤓ Exportar</button>
+          <button id="btnImportProductos" class="ghost">⤒ Importar</button>
+        </div>
+      </div>
+      <div id="listaProductos" class="listaProductos"></div>
+    </div>
+  </section>
+
+  <!-- PENDIENTES -->
+  <section class="panel" data-tab-panel="pendientes">
+    <div class="card">
+      <div class="title-row">
+        <h3>Deudas por cliente</h3>
+        <div class="row">
+          <button id="btnResetCliente" class="ghost">Reset deudas del cliente actual</button>
+          <button id="btnResetGlobal" class="ghost">Reset deudas global</button>
+        </div>
+      </div>
+      <table class="calc-table" id="tblPendientes">
+        <thead>
+          <tr><th>Cliente</th><th>Nº facturas pendientes</th><th>Total pendiente</th><th>Última factura</th><th>Acciones</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="pendiente total">Total pendiente global: <strong id="resGlobal">0,00 €</strong></div>
+    </div>
+  </section>
+
+  <!-- VENTAS -->
+  <section class="panel" data-tab-panel="ventas">
+    <div class="grid2">
+      <div class="card">
+        <h3>Totales globales</h3>
+        <div class="kpis">
+          <div class="kpi"><span>Hoy</span><strong id="vHoy">0,00 €</strong></div>
+          <div class="kpi"><span>Semana</span><strong id="vSemana">0,00 €</strong></div>
+          <div class="kpi"><span>Mes</span><strong id="vMes">0,00 €</strong></div>
+          <div class="kpi"><span>Total</span><strong id="vTotal">0,00 €</strong></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Top 10 productos (total €)</h3>
+        <canvas id="chartTop" height="160"></canvas>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <h3>Ventas diarias (7 días)</h3>
+        <canvas id="chartDiario" height="140"></canvas>
+      </div>
+      <div class="card">
+        <h3>Ventas mensuales (12 meses)</h3>
+        <canvas id="chartMensual" height="140"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="title-row">
+        <h3>Detalle por cliente</h3>
+        <div class="row">
+          <input id="ventasFiltroMes" type="month" />
+          <button id="btnExportVentas" class="ghost">📤 Exportar CSV</button>
+        </div>
+      </div>
+      <table class="calc-table" id="tblVentasCliente">
+        <thead>
+          <tr><th>Cliente</th><th>Hoy</th><th>Semana</th><th>Mes</th><th>Total</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- RESUMEN -->
+  <section class="panel" data-tab-panel="resumen">
+    <div class="card">
+      <h3>Resumen rápido</h3>
+      <div class="kpis">
+        <div class="kpi"><span>Hoy</span><strong id="rHoy">0,00 €</strong></div>
+        <div class="kpi"><span>Semana</span><strong id="rSemana">0,00 €</strong></div>
+        <div class="kpi"><span>Mes</span><strong id="rMes">0,00 €</strong></div>
+        <div class="kpi"><span>Total</span><strong id="rTotal">0,00 €</strong></div>
+      </div>
+      <div class="row actions mt8">
+        <button id="btnBackup">Backup</button>
+        <button id="btnRestore" class="ghost">Restaurar</button>
+      </div>
+    </div>
+  </section>
+
 </main>
 
 <script src="app.js"></script>
