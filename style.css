@@ -233,5 +233,8 @@ body.dark-mode{
 :root[data-theme='sand']{--accent:#ca8a04;--accent-dark:#a16207}
 :root[data-theme='mint']{--accent:#059669;--accent-dark:#047857}
 
-/* --- mejora botón IVA --- */
-#btnAddIVA {margin-top:6px;}
+/* ---------- Mejora estética del botón IVA ---------- */
+#btnAddIVA{
+  margin-top:6px;
+  align-self:flex-start;
+}
