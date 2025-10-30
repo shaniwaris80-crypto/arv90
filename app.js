@@ -642,10 +642,10 @@ function drawResumen(){ drawKPIs(); }
 
   const tb=$('#lineasBody'); if(tb && tb.children.length===0){ for(let i=0;i<5;i++) addLinea(); }
 
-  renderPagosTemp();
-  renderAll(); recalc();
+renderPagosTemp();
+renderAll(); recalc();
 })();
-})();
+
 
 /* ================================
    🎨 SELECTOR DE PALETAS (4 temas)
