@@ -216,6 +216,30 @@ if ('serviceWorker' in navigator) {
       <div id="ppBody"></div>
     </aside>
   </section>
+  <!-- KPIs para VENTAS / RESUMEN -->
+<section class="panel" data-tab-panel="ventas">
+  <h3>📈 Ventas</h3>
+  <div class="kpis">
+    <div class="kpi"><span>Hoy</span><strong id="vHoy">0,00 €</strong></div>
+    <div class="kpi"><span>Semana</span><strong id="vSemana">0,00 €</strong></div>
+    <div class="kpi"><span>Mes</span><strong id="vMes">0,00 €</strong></div>
+    <div class="kpi"><span>Total</span><strong id="vTotal">0,00 €</strong></div>
+  </div>
+  <canvas id="chartDiario" height="120"></canvas>
+  <canvas id="chartMensual" height="120"></canvas>
+  <canvas id="chartTop" height="120"></canvas>
+</section>
+
+<section class="panel" data-tab-panel="resumen">
+  <h3>📊 Resumen</h3>
+  <div class="kpis">
+    <div class="kpi"><span>Hoy</span><strong id="rHoy">0,00 €</strong></div>
+    <div class="kpi"><span>Semana</span><strong id="rSemana">0,00 €</strong></div>
+    <div class="kpi"><span>Mes</span><strong id="rMes">0,00 €</strong></div>
+    <div class="kpi"><span>Total</span><strong id="rTotal">0,00 €</strong></div>
+  </div>
+</section>
+
 
   <!-- (resto del documento idéntico a tu versión original) -->
 </main>
