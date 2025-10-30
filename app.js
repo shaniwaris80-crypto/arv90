@@ -703,3 +703,4 @@ function drawResumen(){ drawKPIs(); }
   aplicarTema(guardadoTema);
   if(guardadoDark) toggleDark();
 })();
+})();
