@@ -1,4 +1,4 @@
-/* ARSLAN V9 PRO — ver. entregada
+/* ARSLAN V9 PRO — ver. entregada (actualizada IVA + Fecha + Edición)
    Splash, tabs, factura avanzada, PDF, clientes pre-cargados + buscador, estados, resumen y gráficos Chart.js
 */
 document.addEventListener('DOMContentLoaded', () => {
@@ -16,6 +16,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let facturas=JSON.parse(localStorage.getItem(K_FACTURAS)||'[]');
   let priceHist=JSON.parse(localStorage.getItem(K_PRICEHIST)||'{}');
 
+  // 👉 Índice de factura en edición (-1 = nueva)
+  let currentEditIndex = -1;
+
   window.addEventListener('load',()=>{setTimeout(()=>{$('#splash').classList.add('fade-out');document.querySelector('[data-tab="factura"]').click();},2000);});
 
   function switchTab(id){$$('button.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===id));$$('section.panel').forEach(p=>p.classList.toggle('active',p.dataset.tabPanel===id));if(id==='resumen'){drawResumen();drawCharts();}}
@@ -26,7 +29,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const prov={nombre:$('#provNombre'),nif:$('#provNif'),dir:$('#provDir'),tel:$('#provTel'),email:$('#provEmail')};
   const cli={nombre:$('#cliNombre'),nif:$('#cliNif'),dir:$('#cliDir'),tel:$('#cliTel'),email:$('#cliEmail')};
   const selCliente=$('#selCliente'); const btnNuevoCliente=$('#btnNuevoCliente');
-  const chkTransporte=$('#chkTransporte'); const chkIvaIncluido=$('#chkIvaIncluido'); const estado=$('#estado'); const pagadoInp=$('#pagado'); const metodoPago=$('#metodoPago'); const observaciones=$('#observaciones');
+  const chkTransporte=$('#chkTransporte');
+  // Nuevo checkbox para IVA real (si no existe aún en HTML, el código sigue funcionando)
+  const chkAplicarIVA = $('#chkAplicarIVA') || null;
+  // El antiguo "IVA incluido (solo mostrar)" se mantiene como compatibilidad si existe
+  const chkIvaIncluido=$('#chkIvaIncluido');
+
+  const estado=$('#estado'); const pagadoInp=$('#pagado'); const metodoPago=$('#metodoPago'); const observaciones=$('#observaciones');
   const subtotalEl=$('#subtotal'),transpEl=$('#transp'),ivaEl=$('#iva'),totalEl=$('#total'),mostPagadoEl=$('#mostPagado'),pendienteEl=$('#pendiente');
 
   const listaClientes=$('#listaClientes'), btnAddCliente=$('#btnAddCliente'), buscarCliente=$('#buscarCliente'), btnExportClientes=$('#btnExportClientes'), btnImportClientes=$('#btnImportClientes');
@@ -34,6 +43,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const rHoy=$('#rHoy'), rSemana=$('#rSemana'), rMes=$('#rMes'), rTotal=$('#rTotal'), resGlobal=$('#resGlobal'), resPorCliente=$('#resPorCliente'), btnResetCliente=$('#btnResetCliente'), btnResetGlobal=$('#btnResetGlobal'), btnBackup=$('#btnBackup'), btnRestore=$('#btnRestore');
   const listaProductos=$('#listaProductos'), btnAddProducto=$('#btnAddProducto'), btnExportProductos=$('#btnExportProductos'), btnImportProductos=$('#btnImportProductos');
   const pNum=$('#p-num'), pFecha=$('#p-fecha'), pProv=$('#p-prov'), pCli=$('#p-cli'), pTabla=$('#p-tabla tbody'), pSub=$('#p-sub'), pTra=$('#p-tra'), pIva=$('#p-iva'), pTot=$('#p-tot'), pEstado=$('#p-estado'), pMetodo=$('#p-metodo'), pObs=$('#p-obs');
+
+  // Campo de fecha editable (si existe en HTML)
+  const fechaFacturaInput = $('#fechaFactura');
+  if (fechaFacturaInput && !fechaFacturaInput.value) {
+    // set default a hoy (yyyy-mm-dd)
+    const hoy = new Date(); const y=hoy.getFullYear(), m=String(hoy.getMonth()+1).padStart(2,'0'), d=String(hoy.getDate()).padStart(2,'0');
+    fechaFacturaInput.value = `${y}-${m}-${d}`;
+  }
 
   function uniqueByName(arr){const map=new Map();arr.forEach(c=>{const k=(c.nombre||'').trim().toLowerCase();if(!k)return;if(!map.has(k))map.set(k,c);});return [...map.values()];}
   function seedClientesIfEmpty(){if(clientes.length>0)return;clientes=uniqueByName([
@@ -131,22 +148,157 @@ document.addEventListener('DOMContentLoaded', () => {
   function getLineas(){return $$('.linea').map(r=>{const name=r.querySelector('.name').value.trim(); const mode=r.querySelector('.mode').value.trim().toLowerCase(); const qty=Math.max(0,Math.floor(parseNum(r.querySelector('.qty').value||0))); const gross=Math.max(0,parseNum(r.querySelector('.gross').value||0)); const tare=Math.max(0,parseNum(r.querySelector('.tare').value||0)); const net=Math.max(0,parseNum(r.querySelector('.net').value||0)); const price=Math.max(0,parseNum(r.querySelector('.price').value||0)); const origin=r.querySelector('.origin').value.trim(); return {name,mode,qty,gross,tare,net,price,origin};}).filter(l=>l.name&&(l.qty>0||l.net>0||l.gross>0));}
   function lineImporte(l){return (l.mode==='unidad')?l.qty*l.price:l.net*l.price;}
 
-  function recalc(){const ls=getLineas(); let subtotal=0; ls.forEach(l=>subtotal+=lineImporte(l)); const transporte=$('#chkTransporte').checked?subtotal*0.10:0; const baseMasTrans=subtotal+transporte; const iva=baseMasTrans*0.04; const total=baseMasTrans; const pagado=parseNum($('#pagado').value); const pendiente=Math.max(0,total-pagado); $('#subtotal').textContent=money(subtotal); $('#transp').textContent=money(transporte); $('#iva').textContent=money(iva); $('#total').textContent=money(total); $('#mostPagado').textContent=money(pagado); $('#pendiente').textContent=money(pendiente); fillPrint(ls,{subtotal,transporte,iva,total}); drawResumen();}
-  ;[$('#chkTransporte'),$('#chkIvaIncluido'),$('#estado'),$('#pagado')].forEach(el=>el?.addEventListener('input',recalc));
+  // 🔄 Recalcular totales (Transporte 10% y, si procede, IVA 4% aplicado)
+  function recalc(){
+    const ls=getLineas();
+    let subtotal=0; ls.forEach(l=>subtotal+=lineImporte(l));
+
+    const transporte = chkTransporte?.checked ? subtotal*0.10 : 0;
+    const baseMasTrans = subtotal + transporte;
+
+    // Si existe chkAplicarIVA → usarlo; si no existe pero hay chkIvaIncluido, NO aplicar IVA
+    const aplicarIVA = !!(chkAplicarIVA && chkAplicarIVA.checked);
+    const iva = aplicarIVA ? baseMasTrans * 0.04 : 0;
+
+    const total = baseMasTrans + iva;
+
+    const pagado=parseNum($('#pagado').value);
+    const pendiente=Math.max(0,total-pagado);
+
+    $('#subtotal').textContent=money(subtotal);
+    $('#transp').textContent=money(transporte);
+    $('#iva').textContent=money(iva);
+    $('#total').textContent=money(total);
+    $('#mostPagado').textContent=money(pagado);
+    $('#pendiente').textContent=money(pendiente);
+
+    fillPrint(ls,{subtotal,transporte,iva,total});
+    drawResumen();
+  }
+  ;[chkTransporte,chkIvaIncluido,chkAplicarIVA,estado,pagadoInp].forEach(el=>el?.addEventListener('input',recalc));
 
   function genNumFactura(){const d=new Date(),pad=n=>String(n).padStart(2,'0'); return `FA-${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;}
   function unMoney(s){return parseFloat(String(s).replace(/\./g,'').replace(',','.').replace(/[^\d.]/g,''))||0;}
   function saveFacturas(){localStorage.setItem(K_FACTURAS, JSON.stringify(facturas));}
 
+  // 🧰 Cargar una factura en el editor para modificar
+  function loadFacturaToEditor(f){
+    // Proveedor
+    prov.nombre.value=f.proveedor?.nombre||''; prov.nif.value=f.proveedor?.nif||''; prov.dir.value=f.proveedor?.dir||''; prov.tel.value=f.proveedor?.tel||''; prov.email.value=f.proveedor?.email||'';
+    // Cliente
+    cli.nombre.value=f.cliente?.nombre||''; cli.nif.value=f.cliente?.nif||''; cli.dir.value=f.cliente?.dir||''; cli.tel.value=f.cliente?.tel||''; cli.email.value=f.cliente?.email||'';
+    // Condiciones
+    if (chkTransporte) chkTransporte.checked = !!f.transporte;
+    if (chkAplicarIVA) chkAplicarIVA.checked = !!(f.totals && f.totals.iva && f.totals.iva>0);
+    if (chkIvaIncluido) chkIvaIncluido.checked = !chkAplicarIVA?.checked; // compat
+    estado.value=f.estado||'pendiente';
+    pagadoInp.value=(f.totals?.pagado||0);
+    metodoPago.value=f.metodo||'Efectivo';
+    observaciones.value=f.obs||'';
+
+    // Fecha editable si existe input
+    if (fechaFacturaInput) {
+      const d = new Date(f.fecha);
+      const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
+      fechaFacturaInput.value = `${y}-${m}-${dd}`;
+    }
+
+    // Líneas
+    lineasDiv.innerHTML='';
+    (f.lineas||[]).forEach(()=>addLinea());
+    const rows = $$('.linea');
+    (f.lineas||[]).forEach((l,idx)=>{
+      const r=rows[idx];
+      r.querySelector('.name').value = l.name||'';
+      r.querySelector('.mode').value = l.mode||'';
+      r.querySelector('.qty').value = l.qty||'';
+      r.querySelector('.gross').value = l.gross||'';
+      r.querySelector('.tare').value = l.tare||'';
+      r.querySelector('.net').value = l.net||'';
+      r.querySelector('.price').value = l.price||'';
+      r.querySelector('.origin').value = l.origin||'';
+      // recalcular importe de línea
+      r.querySelector('.amount').value = (l.mode==='unidad') ? (l.qty*l.price||0).toFixed(2) : (l.net*l.price||0).toFixed(2);
+    });
+
+    recalc();
+  }
+
+  // 💾 Guardar / Actualizar factura
   $('#btnGuardar')?.addEventListener('click',()=>{
     const ls=getLineas(); if(ls.length===0){alert('Añade al menos una línea.');return;}
-    const numero=genNumFactura(); const now=todayISO();
+
+    // Empujar historial de precios
     ls.forEach(l=>pushPriceHistory(l.name,l.price));
-    const subtotal=unMoney($('#subtotal').textContent), transporte=unMoney($('#transp').textContent), iva=unMoney($('#iva').textContent), total=unMoney($('#total').textContent), pagado=parseNum($('#pagado').value), pendiente=Math.max(0,total-pagado);
-    const factura={numero,fecha:now, proveedor:{nombre:$('#provNombre').value,nif:$('#provNif').value,dir:$('#provDir').value,tel:$('#provTel').value,email:$('#provEmail').value}, cliente:{nombre:$('#cliNombre').value,nif:$('#cliNif').value,dir:$('#cliDir').value,tel:$('#cliTel').value,email:$('#cliEmail').value}, lineas:ls, transporte:$('#chkTransporte').checked, ivaIncluido:$('#chkIvaIncluido').checked, estado:$('#estado').value, metodo:$('#metodoPago').value, obs:$('#observaciones').value, totals:{subtotal,transporte,iva,total,pagado,pendiente}};
-    facturas.unshift(factura); saveFacturas(); alert(`Factura ${numero} guardada.`); renderFacturas(); renderResumen(); fillPrint(ls,{subtotal,transporte,iva,total},factura);
+
+    // Totales en UI
+    const subtotal=unMoney($('#subtotal').textContent), transporte=unMoney($('#transp').textContent), iva=unMoney($('#iva').textContent), total=unMoney($('#total').textContent);
+    const pagado=parseNum($('#pagado').value), pendiente=Math.max(0,total-pagado);
+
+    // Fecha desde input si existe
+    let fechaISO;
+    if (fechaFacturaInput && fechaFacturaInput.value) {
+      // Normalizamos a mediodía para evitar TZ raras
+      fechaISO = new Date(fechaFacturaInput.value + 'T12:00:00').toISOString();
+    } else {
+      fechaISO = todayISO();
+    }
+
+    // ¿Nueva o edición?
+    if (currentEditIndex >= 0) {
+      // Actualizar EXISTENTE (mismo número)
+      const f = facturas[currentEditIndex];
+      f.fecha = fechaISO;
+      f.proveedor = {nombre:prov.nombre.value,nif:prov.nif.value,dir:prov.dir.value,tel:prov.tel.value,email:prov.email.value};
+      f.cliente = {nombre:cli.nombre.value,nif:cli.nif.value,dir:cli.dir.value,tel:cli.tel.value,email:cli.email.value};
+      f.lineas = ls;
+      f.transporte = !!(chkTransporte?.checked);
+      // Guardamos si se aplicó IVA
+      f.ivaIncluido = chkAplicarIVA ? !chkAplicarIVA.checked : (chkIvaIncluido?.checked||false);
+      f.estado = estado.value;
+      f.metodo = metodoPago.value;
+      f.obs = observaciones.value;
+      f.totals = {subtotal,transporte,iva,total,pagado,pendiente};
+      facturas[currentEditIndex] = f;
+      saveFacturas();
+      alert(`Factura ${f.numero} actualizada.`);
+    } else {
+      // Nueva factura
+      const numero=genNumFactura();
+      const factura={
+        numero, fecha:fechaISO,
+        proveedor:{nombre:$('#provNombre').value,nif:$('#provNif').value,dir:$('#provDir').value,tel:$('#provTel').value,email:$('#provEmail').value},
+        cliente:{nombre:$('#cliNombre').value,nif:$('#cliNif').value,dir:$('#cliDir').value,tel:$('#cliTel').value,email:$('#cliEmail').value},
+        lineas:ls,
+        transporte:$('#chkTransporte').checked,
+        // si hay chkAplicarIVA: ivaIncluido = !aplicarIVA; si no existe, respetar el viejo checkbox
+        ivaIncluido: chkAplicarIVA ? !chkAplicarIVA.checked : ($('#chkIvaIncluido')?.checked||false),
+        estado:$('#estado').value, metodo:$('#metodoPago').value, obs:$('#observaciones').value,
+        totals:{subtotal,transporte,iva,total,pagado,pendiente}
+      };
+      facturas.unshift(factura); saveFacturas(); alert(`Factura ${numero} guardada.`);
+    }
+
+    // Reset edición y refrescos
+    currentEditIndex = -1;
+    renderFacturas(); renderResumen(); fillPrint(ls,{subtotal,transporte,iva,total});
   });
-  $('#btnNueva')?.addEventListener('click',()=>{lineasDiv.innerHTML=''; for(let i=0;i<5;i++) addLinea(); $('#chkTransporte').checked=false; $('#chkIvaIncluido').checked=true; $('#estado').value='pendiente'; $('#pagado').value=''; $('#metodoPago').value='Efectivo'; $('#observaciones').value=''; recalc();});
+
+  $('#btnNueva')?.addEventListener('click',()=>{
+    lineasDiv.innerHTML=''; for(let i=0;i<5;i++) addLinea();
+    if(chkTransporte) chkTransporte.checked=false;
+    if(chkAplicarIVA) chkAplicarIVA.checked=false;
+    if(chkIvaIncluido) chkIvaIncluido.checked=true;
+    $('#estado').value='pendiente'; $('#pagado').value=''; $('#metodoPago').value='Efectivo'; $('#observaciones').value='';
+    // reset fecha a hoy si existe
+    if (fechaFacturaInput) {
+      const hoy = new Date(); const y=hoy.getFullYear(), m=String(hoy.getMonth()+1).padStart(2,'0'), d=String(hoy.getDate()).padStart(2,'0');
+      fechaFacturaInput.value = `${y}-${m}-${d}`;
+    }
+    currentEditIndex = -1;
+    recalc();
+  });
+
   $('#btnImprimir')?.addEventListener('click',()=>window.print());
 
   function badgeEstado(f){if(f.estado==='pagado')return`<span class="badge ok">Pagada</span>`; if(f.estado==='parcial'){const resta=Math.max(0,(f.totals?.total||0)-(f.totals?.pagado||0)); return `<span class="badge warn">Parcial · resta ${money(resta)}</span>`;} return `<span class="badge bad">Pendiente</span>`;}
@@ -156,7 +308,14 @@ document.addEventListener('DOMContentLoaded', () => {
           <button class="btn small" data-e="ver" data-i="${idx}">Ver</button>
           <button class="btn small" data-e="cobrar" data-i="${idx}">💶 Cobrado</button>
           <button class="btn small ghost" data-e="pdf" data-i="${idx}">PDF Factura</button></div>`; listaFacturas.appendChild(div); });
-    listaFacturas.querySelectorAll('button').forEach(b=>{const i=+b.dataset.i; b.addEventListener('click',()=>{const f=facturas[i]; if(b.dataset.e==='ver'){fillPrint(f.lineas,f.totals,f); switchTab('factura'); $('#printArea').scrollIntoView({behavior:'smooth'}); return;} if(b.dataset.e==='cobrar'){const tot=f.totals.total||0; f.totals.pagado=tot; f.totals.pendiente=0; f.estado='pagado'; saveFacturas(); renderFacturas(); renderResumen(); drawResumen(); return;} if(b.dataset.e==='pdf'){fillPrint(f.lineas,f.totals,f); const dt=new Date(f.fecha); const nombreCliente=(f.cliente?.nombre||'Cliente').replace(/\s+/g,''); const filename=`Factura-${nombreCliente}-${fmtDateDMY(dt)}.pdf`; const opt={margin:10, filename, image:{type:'jpeg',quality:0.98}, html2canvas:{scale:2}, jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}; html2pdf().set(opt).from(document.getElementById('printArea')).save(); return;}});});}
+    listaFacturas.querySelectorAll('button').forEach(b=>{const i=+b.dataset.i; b.addEventListener('click',()=>{const f=facturas[i]; if(b.dataset.e==='ver'){
+          // Cargar factura en editor y preparar edición
+          loadFacturaToEditor(f);
+          currentEditIndex = i;
+          fillPrint(f.lineas,f.totals,f); switchTab('factura'); $('#printArea').scrollIntoView({behavior:'smooth'}); return;
+        }
+        if(b.dataset.e==='cobrar'){const tot=f.totals.total||0; f.totals.pagado=tot; f.totals.pendiente=0; f.estado='pagado'; saveFacturas(); renderFacturas(); renderResumen(); drawResumen(); return;}
+        if(b.dataset.e==='pdf'){fillPrint(f.lineas,f.totals,f); const dt=new Date(f.fecha); const nombreCliente=(f.cliente?.nombre||'Cliente').replace(/\s+/g,''); const filename=`Factura-${nombreCliente}-${fmtDateDMY(dt)}.pdf`; const opt={margin:10, filename, image:{type:'jpeg',quality:0.98}, html2canvas:{scale:2}, jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}; html2pdf().set(opt).from(document.getElementById('printArea')).save(); return;}});});}
   [filtroEstado,buscaCliente].forEach(el=>el?.addEventListener('input',renderFacturas));
   btnExportFacturas?.addEventListener('click',()=>downloadJSON(facturas,'facturas-arslan-v9.json'));
   btnImportFacturas?.addEventListener('click',()=>uploadJSON(arr=>{if(Array.isArray(arr)){facturas=arr; saveFacturas(); renderFacturas(); renderResumen();}}));
@@ -170,11 +329,31 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#btnResetCliente')?.addEventListener('click',()=>{const i=selCliente.value; if(i===''){alert('Selecciona un cliente en la pestaña Factura.'); return;} const nombre=clientes[+i]?.nombre||''; if(!nombre){alert('Cliente sin nombre.'); return;} if(!confirm(`¿Resetear deudas del cliente "${nombre}"?`)) return; facturas=facturas.map(f=>{if((f.cliente?.nombre||'')===nombre){const n={...f, totals:{...f.totals}}; const tot=n.totals.total||0; n.totals.pagado=tot; n.totals.pendiente=0; n.estado='pagado'; return n;} return f;}); saveFacturas(); renderFacturas(); drawResumen();});
   $('#btnResetGlobal')?.addEventListener('click',()=>{if(!confirm('¿Resetear TODAS las deudas?')) return; facturas=facturas.map(f=>{const n={...f, totals:{...f.totals}}; const tot=n.totals.total||0; n.totals.pagado=tot; n.totals.pendiente=0; n.estado='pagado'; return n;}); saveFacturas(); renderFacturas(); drawResumen();});
 
-  function fillPrint(lines, totals, factura=null){ $('#p-num').textContent=factura?.numero||'(Sin guardar)'; $('#p-fecha').textContent=(factura?new Date(factura.fecha):new Date()).toLocaleString();
+  function fillPrint(lines, totals, factura=null){
+    $('#p-num').textContent=factura?.numero||'(Sin guardar)';
+    $('#p-fecha').textContent=(factura?new Date(factura.fecha):new Date()).toLocaleString();
+
     $('#p-prov').innerHTML=`<div><strong>${escapeHTML(factura?.proveedor?.nombre||$('#provNombre').value||'')}</strong></div><div>${escapeHTML(factura?.proveedor?.nif||$('#provNif').value||'')}</div><div>${escapeHTML(factura?.proveedor?.dir||$('#provDir').value||'')}</div><div>${escapeHTML(factura?.proveedor?.tel||$('#provTel').value||'')} · ${escapeHTML(factura?.proveedor?.email||$('#provEmail').value||'')}</div>`;
     $('#p-cli').innerHTML=`<div><strong>${escapeHTML(factura?.cliente?.nombre||$('#cliNombre').value||'')}</strong></div><div>${escapeHTML(factura?.cliente?.nif||$('#cliNif').value||'')}</div><div>${escapeHTML(factura?.cliente?.dir||$('#cliDir').value||'')}</div><div>${escapeHTML(factura?.cliente?.tel||$('#cliTel').value||'')} · ${escapeHTML(factura?.cliente?.email||$('#cliEmail').value||'')}</div>`;
-    const tbody=document.querySelector('#p-tabla tbody'); tbody.innerHTML=''; (lines||[]).forEach(l=>{const tr=document.createElement('tr'); tr.innerHTML=`<td>${escapeHTML(l.name)}</td><td>${escapeHTML(l.mode||'')}</td><td>${l.qty||''}</td><td>${l.net?l.net.toFixed(2):''}</td><td>${money(l.price)}</td><td>${escapeHTML(l.origin||'')}</td><td>${money((l.mode==='unidad')?l.qty*l.price:l.net*l.price)}</td>`; tbody.appendChild(tr);});
-    $('#p-sub').textContent=money(totals?.subtotal||0); $('#p-tra').textContent=money(totals?.transporte||0); $('#p-iva').textContent=money(totals?.iva||0); $('#p-tot').textContent=money(totals?.total||0); $('#p-estado').textContent=factura?.estado||$('#estado').value; $('#p-metodo').textContent=factura?.metodo||$('#metodoPago').value; $('#p-obs').textContent=factura?.obs||($('#observaciones').value||'—');}
+
+    const tbody=document.querySelector('#p-tabla tbody'); tbody.innerHTML='';
+    (lines||[]).forEach(l=>{const tr=document.createElement('tr'); tr.innerHTML=`<td>${escapeHTML(l.name)}</td><td>${escapeHTML(l.mode||'')}</td><td>${l.qty||''}</td><td>${l.net?l.net.toFixed(2):''}</td><td>${money(l.price)}</td><td>${escapeHTML(l.origin||'')}</td><td>${money((l.mode==='unidad')?l.qty*l.price:l.net*l.price)}</td>`; tbody.appendChild(tr);});
+
+    $('#p-sub').textContent=money(totals?.subtotal||0);
+    $('#p-tra').textContent=money(totals?.transporte||0);
+    $('#p-iva').textContent=money(totals?.iva||0);
+    $('#p-tot').textContent=money(totals?.total||0);
+    $('#p-estado').textContent=factura?.estado||$('#estado').value;
+    $('#p-metodo').textContent=factura?.metodo||$('#metodoPago').value;
+
+    // Si no se aplica IVA (o se marcó "IVA incluido" de compat), añadir nota en PDF
+    const ivaAplicadoAhora = !!(chkAplicarIVA && chkAplicarIVA.checked);
+    const debeMostrarNota = (!ivaAplicadoAhora) || (factura && factura.ivaIncluido===true);
+    const obsVal = (factura?.obs ?? ($('#observaciones').value||'—'));
+    $('#p-obs').textContent = debeMostrarNota
+      ? (obsVal && obsVal !== '—' ? (obsVal + ' · IVA incluido en los precios.') : 'IVA incluido en los precios.')
+      : (obsVal || '—');
+  }
 
   function downloadJSON(obj,filename){const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);}
   function uploadJSON(cb){const inp=document.createElement('input'); inp.type='file'; inp.accept='application/json'; inp.onchange=e=>{const f=e.target.files[0]; if(!f) return; const reader=new FileReader(); reader.onload=()=>{try{cb(JSON.parse(reader.result));}catch{alert('JSON inválido');}}; reader.readAsText(f);}; inp.click();}
