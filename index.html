@@ -356,5 +356,31 @@ if ('serviceWorker' in navigator) {
 </main>
 
 <script src="app.js"></script>
+  <!-- 🔌 Conexión con Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // Inicialización de Supabase
+  const SUPABASE_URL = "https://bbfxtwnuarcneymlixco.supabase.co";
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJiZnh0d251YXJjbmV5bWxpeGNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE2NjkwMjMsImV4cCI6MjA3NzI0NTAyM30.VW5sX_q8oqaYJDWhUZeaBLn9xIkBcm-_Fr9i8ItHUn8";
+
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  // 🔍 Verificar conexión automática
+  async function testSupabaseConnection() {
+    try {
+      const { data, error } = await supabase.from("clientes").select("*").limit(1);
+      if (error) {
+        console.error("❌ Error conectando a Supabase:", error.message);
+      } else {
+        console.log("✅ Conectado a Supabase correctamente. Ejemplo de datos:", data);
+      }
+    } catch (err) {
+      console.error("⚠️ Error inesperado:", err);
+    }
+  }
+
+  testSupabaseConnection();
+</script>
+
 </body>
 </html>
