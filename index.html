@@ -124,7 +124,8 @@
           <h2>Condiciones</h2>
           <div class="rows">
             <label class="check"><input type="checkbox" id="chkTransporte"> +10% Transporte</label>
-            <label class="check"><input type="checkbox" id="chkIvaIncluido" checked> IVA 4% incluido (solo mostrar)</label>
+            <!-- Cambio: checkbox real de IVA 4% -->
+            <label class="check"><input type="checkbox" id="chkAplicarIva"> Aplicar IVA 4%</label>
             <div class="row-inline">
               <label>Estado:</label>
               <select id="estado">
@@ -148,12 +149,19 @@
           <div class="rows compact">
             <div class="kv"><span>Subtotal</span><strong id="subtotal">0,00 €</strong></div>
             <div class="kv"><span>Transporte 10%</span><strong id="transp">0,00 €</strong></div>
-            <div class="kv"><span>IVA (4% mostrado)</span><strong id="iva">0,00 €</strong></div>
+            <div class="kv"><span>IVA (4%)</span><strong id="iva">0,00 €</strong></div>
             <div class="divider"></div>
             <div class="kv total"><span>Total</span><strong id="total">0,00 €</strong></div>
             <div class="kv"><span>Pagado</span><strong id="mostPagado">0,00 €</strong></div>
             <div class="kv"><span>Pendiente</span><strong id="pendiente">0,00 €</strong></div>
           </div>
+
+          <!-- NUEVO: fecha editable de factura -->
+          <div class="rows" style="margin-top:8px">
+            <label for="fechaFactura" class="muted">Fecha de factura</label>
+            <input id="fechaFactura" type="date" />
+          </div>
+
           <div class="buttons">
             <button id="btnGuardar" class="btn primary">Guardar factura</button>
             <button id="btnImprimir" class="btn">Imprimir</button>
@@ -227,7 +235,7 @@
           <tfoot>
             <tr><td colspan="6" class="right">Subtotal</td><td id="p-sub">0,00 €</td></tr>
             <tr><td colspan="6" class="right">Transporte 10%</td><td id="p-tra">0,00 €</td></tr>
-            <tr><td colspan="6" class="right">IVA (4% mostrado)</td><td id="p-iva">0,00 €</td></tr>
+            <tr><td colspan="6" class="right">IVA (4%)</td><td id="p-iva">0,00 €</td></tr>
             <tr class="total"><td colspan="6" class="right">TOTAL</td><td id="p-tot">0,00 €</td></tr>
           </tfoot>
         </table>
@@ -235,6 +243,8 @@
         <div class="print-notes">
           <div><strong>Estado:</strong> <span id="p-estado">—</span> · <strong>Pago:</strong> <span id="p-metodo">—</span></div>
           <div><strong>Obs.:</strong> <span id="p-obs">—</span></div>
+          <!-- NUEVO: nota de IVA incluido -->
+          <div id="p-iva-note" class="muted-note" hidden>IVA incluido en los precios.</div>
         </div>
       </section>
     </section>
