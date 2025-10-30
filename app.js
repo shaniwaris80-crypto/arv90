@@ -410,25 +410,6 @@ function drawResumen(){ drawKPIs(); }
   aplicarTema(guardadoTema);
   if(guardadoDark) toggleDark();
 })();
-})();
-
-
-function drawKPIs(){
-  const now=new Date();
-  const hoy = sumBetween(startOfDay(now), endOfDay(now));
-  const semana = sumBetween(startOfWeek(now), endOfDay(now));
-  const mes = sumBetween(startOfMonth(now), endOfDay(now));
-  const total = facturas.reduce((a,f)=>a+(f.totals?.total||0),0);
-  $('#vHoy').textContent=money(hoy);
-  $('#vSemana').textContent=money(semana);
-  $('#vMes').textContent=money(mes);
-  $('#vTotal').textContent=money(total);
-
-  $('#rHoy').textContent=money(hoy);
-  $('#rSemana').textContent=money(semana);
-  $('#rMes').textContent=money(mes);
-  $('#rTotal').textContent=money(total);
-}
 
 let chart1, chart2, chartTop;
 function groupDaily(n=7){
@@ -643,33 +624,9 @@ function drawResumen(){ drawKPIs(); }
   const tb=$('#lineasBody'); if(tb && tb.children.length===0){ for(let i=0;i<5;i++) addLinea(); }
 
 renderPagosTemp();
-renderAll(); recalc();
-})();
-
-
 /* ================================
    🎨 SELECTOR DE PALETAS (4 temas)
    ================================ */
-(function(){
-  const PALETAS = {
-    kiwi:    {bg:'#ffffff', text:'#1e293b', accent:'#16a34a', border:'#d1d5db', muted:'#6b7280'},
-    graphite:{bg:'#111827', text:'#f9fafb', accent:'#3b82f6', border:'#374151', muted:'#94a3b8'},
-    sand:    {bg:'#fefce8', text:'#3f3f46', accent:'#ca8a04', border:'#e7e5e4', muted:'#78716c'},
-    mint:    {bg:'#ecfdf5', text:'#065f46', accent:'#059669', border:'#a7f3d0', muted:'#0f766e'}
-  };
-
-  const bar = document.createElement('div');
-  bar.id = 'colorToolbar';
-  document.body.appendChild(bar);
-
-  // Botones de paleta
-  for(const [name,p] of Object.entries(PALETAS)){
-    const b=document.createElement('button');
-    b.title=name; b.style.background=p.accent;
-    b.onclick=()=>aplicarTema(name);
-    bar.appendChild(b);
-  }
-
   // Botón modo claro/oscuro
   const toggle=document.createElement('button');
   toggle.className='dark-toggle';
